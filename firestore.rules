@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      // 開発・運用初期用のルール（誰でも読み書き可能）
+      // ※本格運用時にセキュリティを高める場合は、Firebase Authenticationとの連携が必要です
+      allow read, write: if true;
+    }
+  }
+}
