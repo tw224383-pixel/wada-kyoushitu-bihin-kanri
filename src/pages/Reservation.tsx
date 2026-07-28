@@ -284,7 +284,7 @@ export default function Reservation() {
               </div>
             ) : (
               <div className={styles.listGrid}>
-                {rooms.map(room => (
+                {[...rooms].sort((a, b) => a.floor - b.floor).map(room => (
                   <div 
                     key={room.id}
                     className={styles.roomCard}
