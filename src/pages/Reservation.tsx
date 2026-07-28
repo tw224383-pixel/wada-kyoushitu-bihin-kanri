@@ -3,7 +3,7 @@ import { CalendarDays, Map, List, MapPin, X, Download, ChevronLeft, ChevronRight
 import styles from './Reservation.module.css';
 import { exportToExcel } from '../utils/excelExport';
 import { db } from '../firebase';
-import { collection, onSnapshot, doc, writeBatch, query, where, getDocs, deleteDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, writeBatch } from 'firebase/firestore';
 
 const PERIODS = [
   { id: 1, name: '1限' },
