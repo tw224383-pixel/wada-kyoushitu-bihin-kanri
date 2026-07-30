@@ -16,8 +16,9 @@ const PERIODS = [
 ];
 
 type Room = { id: string; name: string; floor: number; x: number; y: number };
-type TimetableEntry = { id: string; dayOfWeek: string; period: string; roomName: string; borrower: string };
+type TimetableEntry = { id: string; dayOfWeek: string; period: string; roomName: string; borrower: string; abWeek?: string };
 type ReservationData = { id: string; roomId: string; date: string; periodId: number; borrower: string };
+type WeekMapping = { id: string; startDate: string; endDate: string; weekType: string };
 
 const getMonday = (d: Date) => {
   const date = new Date(d);
@@ -36,6 +37,7 @@ export default function Reservation() {
   const [teachers, setTeachers] = useState<string[]>([]);
   const [timetables, setTimetables] = useState<TimetableEntry[]>([]);
   const [reservations, setReservations] = useState<ReservationData[]>([]);
+  const [weekMappings, setWeekMappings] = useState<WeekMapping[]>([]);
   
   const [showList, setShowList] = useState(false);
   const [selectedCells, setSelectedCells] = useState<{date: string, periodId: number}[]>([]);
@@ -57,12 +59,16 @@ export default function Reservation() {
     const unsubReservations = onSnapshot(collection(db, 'reservations'), (snap) => {
       setReservations(snap.docs.map(d => ({ id: d.id, ...d.data() } as ReservationData)));
     });
+    const unsubWeekMappings = onSnapshot(collection(db, 'week_mappings'), (snap) => {
+      setWeekMappings(snap.docs.map(d => ({ id: d.id, ...d.data() } as WeekMapping)));
+    });
 
     return () => {
       unsubRooms();
       unsubTeachers();
       unsubTimetables();
       unsubReservations();
+      unsubWeekMappings();
     };
   }, []);
 
@@ -96,8 +102,26 @@ export default function Reservation() {
     setSelectedCells([]);
   };
 
+  const currentWeekType = useMemo(() => {
+    const currentMs = currentWeekStart.getTime();
+    for (const mapping of weekMappings) {
+      if (!mapping.startDate || !mapping.endDate) continue;
+      const start = new Date(mapping.startDate.replace(/\//g, '-')).getTime();
+      const end = new Date(mapping.endDate.replace(/\//g, '-')).getTime();
+      if (currentMs >= start && currentMs <= end) {
+        return mapping.weekType;
+      }
+    }
+    return '';
+  }, [currentWeekStart, weekMappings]);
+
   const getTimetableForCell = (dayName: string, periodName: string, roomName: string) => {
-    return timetables.find(t => t.dayOfWeek === dayName && t.period === periodName && t.roomName === roomName);
+    return timetables.find(t => 
+      t.dayOfWeek === dayName && 
+      t.period === periodName && 
+      t.roomName === roomName &&
+      (!t.abWeek || t.abWeek === '共通' || t.abWeek === currentWeekType)
+    );
   };
 
   const toggleCellSelection = (dateStr: string, periodId: number, isOccupied: boolean) => {
@@ -373,7 +397,10 @@ export default function Reservation() {
                         }}
                         style={{padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--surface-color-light)', color: 'var(--text-primary)', fontSize: '1rem'}}
                       />
-                      <h3 style={{margin: 0}}>{weekDays[0].label} 〜 {weekDays[4].label}</h3>
+                      <h3 style={{margin: 0}}>
+                        {weekDays[0].label} 〜 {weekDays[4].label}
+                        {currentWeekType && <span style={{color: 'var(--accent-gold)', marginLeft: '8px'}}>【{currentWeekType}週】</span>}
+                      </h3>
                       <button 
                         onClick={() => setShowList(true)}
                         style={{display: 'flex', alignItems: 'center', gap: '6px', fontSize: '1rem', padding: '8px 16px', background: 'var(--accent-gold)', border: 'none', color: 'var(--bg-color)', borderRadius: 'var(--radius-md)', fontWeight: 'bold', marginLeft: '1rem'}}

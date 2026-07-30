@@ -58,11 +58,25 @@ export const downloadExcelTemplate = () => {
       "dayOfWeek": "曜日 (例: 月)",
       "period": "時間帯 (例: 1限)",
       "roomName": "教室名 (例: 理科室)",
-      "borrower": "使用者・授業名 (例: 5年1組 理科)"
+      "borrower": "使用者・授業名 (例: 5年1組 理科)",
+      "abWeek": "A/B週 (A, B, 共通)"
     },
-    { "dayOfWeek": "月", "period": "1限", "roomName": "理科室", "borrower": "5年1組 理科" },
-    { "dayOfWeek": "火", "period": "3限", "roomName": "音楽室", "borrower": "4年2組 音楽" },
-    { "dayOfWeek": "水", "period": "レインボータイム", "roomName": "図書室", "borrower": "図書委員" },
+    { "dayOfWeek": "月", "period": "1限", "roomName": "理科室", "borrower": "5年1組 理科", "abWeek": "共通" },
+    { "dayOfWeek": "火", "period": "3限", "roomName": "音楽室", "borrower": "4年2組 音楽", "abWeek": "A" },
+    { "dayOfWeek": "火", "period": "3限", "roomName": "音楽室", "borrower": "4年1組 音楽", "abWeek": "B" },
+    { "dayOfWeek": "水", "period": "レインボータイム", "roomName": "図書室", "borrower": "図書委員", "abWeek": "共通" },
+  ];
+
+  // 5. A・B週設定マスター
+  const weekMappingsData = [
+    {
+      "startDate": "開始日 (YYYY/MM/DD)",
+      "endDate": "終了日 (YYYY/MM/DD)",
+      "weekType": "A/B週 (A または B)"
+    },
+    { "startDate": "2026/04/06", "endDate": "2026/04/12", "weekType": "A" },
+    { "startDate": "2026/04/13", "endDate": "2026/04/19", "weekType": "B" },
+    { "startDate": "2026/04/20", "endDate": "2026/04/26", "weekType": "A" }
   ];
 
   // シート作成
@@ -70,18 +84,21 @@ export const downloadExcelTemplate = () => {
   const wsRooms = XLSX.utils.json_to_sheet(roomsData);
   const wsTeachers = XLSX.utils.json_to_sheet(teachersData);
   const wsTimetable = XLSX.utils.json_to_sheet(timetableData);
+  const wsWeekMappings = XLSX.utils.json_to_sheet(weekMappingsData);
 
   // 幅調整
   wsEquipments['!cols'] = [{wch:25}, {wch:15}, {wch:20}, {wch:10}, {wch:10}, {wch:15}, {wch:15}];
   wsRooms['!cols'] = [{wch:15}, {wch:20}, {wch:10}, {wch:15}, {wch:15}];
   wsTeachers['!cols'] = [{wch:25}];
-  wsTimetable['!cols'] = [{wch:15}, {wch:15}, {wch:20}, {wch:30}];
+  wsTimetable['!cols'] = [{wch:15}, {wch:15}, {wch:20}, {wch:30}, {wch:15}];
+  wsWeekMappings['!cols'] = [{wch:20}, {wch:20}, {wch:15}];
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, wsEquipments, '備品マスター');
   XLSX.utils.book_append_sheet(workbook, wsRooms, '教室マスター');
   XLSX.utils.book_append_sheet(workbook, wsTeachers, '教職員マスター');
   XLSX.utils.book_append_sheet(workbook, wsTimetable, '時間割マスター');
+  XLSX.utils.book_append_sheet(workbook, wsWeekMappings, 'A・B週設定');
   
   XLSX.writeFile(workbook, `和田小学校_初期設定マスター.xlsx`);
 };
@@ -92,6 +109,7 @@ export const exportCurrentMasterData = async () => {
     const rmSnap = await getDocs(collection(db, 'rooms'));
     const tSnap = await getDocs(collection(db, 'teachers'));
     const ttSnap = await getDocs(collection(db, 'timetable'));
+    const wmSnap = await getDocs(collection(db, 'week_mappings'));
 
     const equipmentsData = [
       {
@@ -147,7 +165,8 @@ export const exportCurrentMasterData = async () => {
         "dayOfWeek": "曜日 (例: 月)",
         "period": "時間帯 (例: 1限)",
         "roomName": "教室名 (例: 理科室)",
-        "borrower": "使用者・授業名 (例: 5年1組 理科)"
+        "borrower": "使用者・授業名 (例: 5年1組 理科)",
+        "abWeek": "A/B週 (A, B, 共通)"
       },
       ...ttSnap.docs.map(doc => {
         const d = doc.data();
@@ -155,7 +174,24 @@ export const exportCurrentMasterData = async () => {
           "dayOfWeek": d.dayOfWeek || "",
           "period": d.period || "",
           "roomName": d.roomName || "",
-          "borrower": d.borrower || ""
+          "borrower": d.borrower || "",
+          "abWeek": d.abWeek || "共通"
+        };
+      })
+    ];
+
+    const weekMappingsData = [
+      {
+        "startDate": "開始日 (YYYY/MM/DD)",
+        "endDate": "終了日 (YYYY/MM/DD)",
+        "weekType": "A/B週 (A または B)"
+      },
+      ...wmSnap.docs.map(doc => {
+        const d = doc.data();
+        return {
+          "startDate": d.startDate || "",
+          "endDate": d.endDate || "",
+          "weekType": d.weekType || ""
         };
       })
     ];
@@ -165,18 +201,21 @@ export const exportCurrentMasterData = async () => {
     const wsRooms = XLSX.utils.json_to_sheet(roomsData);
     const wsTeachers = XLSX.utils.json_to_sheet(teachersData);
     const wsTimetable = XLSX.utils.json_to_sheet(timetableData);
+    const wsWeekMappings = XLSX.utils.json_to_sheet(weekMappingsData);
 
     // 幅調整
     wsEquipments['!cols'] = [{wch:25}, {wch:15}, {wch:20}, {wch:10}, {wch:10}, {wch:15}, {wch:15}];
     wsRooms['!cols'] = [{wch:15}, {wch:20}, {wch:10}, {wch:15}, {wch:15}];
     wsTeachers['!cols'] = [{wch:25}];
-    wsTimetable['!cols'] = [{wch:15}, {wch:15}, {wch:20}, {wch:30}];
+    wsTimetable['!cols'] = [{wch:15}, {wch:15}, {wch:20}, {wch:30}, {wch:15}];
+    wsWeekMappings['!cols'] = [{wch:20}, {wch:20}, {wch:15}];
 
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, wsEquipments, '備品マスター');
     XLSX.utils.book_append_sheet(workbook, wsRooms, '教室マスター');
     XLSX.utils.book_append_sheet(workbook, wsTeachers, '教職員マスター');
     XLSX.utils.book_append_sheet(workbook, wsTimetable, '時間割マスター');
+    XLSX.utils.book_append_sheet(workbook, wsWeekMappings, 'A・B週設定');
     
     XLSX.writeFile(workbook, `和田小学校_現在のマスターデータ.xlsx`);
   } catch (error) {

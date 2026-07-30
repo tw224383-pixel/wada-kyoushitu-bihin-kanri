@@ -82,13 +82,30 @@ export const importEquipmentsFromExcel = async (file: File): Promise<void> => {
               dayOfWeek: item.dayOfWeek,
               period: item.period,
               roomName: item.roomName,
-              borrower: item.borrower
+              borrower: item.borrower,
+              abWeek: item.abWeek || '共通'
+            });
+          });
+        }
+        // 5. A・B週設定のインポート
+        if (workbook.SheetNames.includes("A・B週設定")) {
+          const ws = workbook.Sheets["A・B週設定"];
+          const json = XLSX.utils.sheet_to_json<any>(ws);
+          const colRef = collection(db, 'week_mappings');
+          
+          json.forEach((item, index) => {
+            if(index === 0) return; // 1行目スキップ
+            const newDocRef = doc(colRef);
+            batch.set(newDocRef, {
+              startDate: item.startDate,
+              endDate: item.endDate,
+              weekType: item.weekType
             });
           });
         }
         
         await batch.commit();
-        console.log("Batch commit for: Equipments, Rooms, Teachers, Timetable completed.");
+        console.log("Batch commit for: Equipments, Rooms, Teachers, Timetable, WeekMappings completed.");
         
         resolve();
       } catch (err) {
