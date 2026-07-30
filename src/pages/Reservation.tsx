@@ -209,34 +209,40 @@ export default function Reservation() {
     const batch = writeBatch(db);
     let deletedCount = 0;
     for (const cell of selectedCells) {
-      const existing = reservations.find(r => r.roomId === selectedRoom.id && r.date === cell.date && r.periodId === cell.periodId);
-      if (existing) {
-        batch.delete(doc(db, 'reservations', existing.id));
-        deletedCount++;
-      }
+      const existingRes = reservations.find(r => r.roomId === selectedRoom.id && r.date === cell.date && r.periodId === cell.periodId);
+      const d = new Date(Number(cell.date.split('-')[0]), Number(cell.date.split('-')[1]) - 1, Number(cell.date.split('-')[2]));
+      const jpDays = ['日','月','火','水','木','金','土'];
+      const dayName = jpDays[d.getDay()];
+      const periodName = PERIODS.find(p => p.id === cell.periodId)?.name;
+      const existingTime = periodName ? getTimetableForCell(dayName, periodName, selectedRoom.name) : undefined;
 
-      if (isKyomuMode) {
-        const parts = cell.date.split('-');
-        const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-        const jpDays = ['日','月','火','水','木','金','土'];
-        const dayName = jpDays[d.getDay()];
-        const periodName = PERIODS.find(p => p.id === cell.periodId)?.name;
-        
-        if (periodName) {
-          const existingTime = getTimetableForCell(dayName, periodName, selectedRoom.name);
-          if (existingTime) {
-            batch.delete(doc(db, 'timetable', existingTime.id));
-            deletedCount++;
-          }
+      if (!isKyomuMode) {
+        if (existingRes && existingRes.borrower !== '【キャンセル】') {
+          batch.delete(doc(db, 'reservations', existingRes.id));
+          deletedCount++;
+        }
+      } else {
+        if (existingRes) {
+          batch.delete(doc(db, 'reservations', existingRes.id));
+          deletedCount++;
+        } else if (existingTime) {
+          const newRef = doc(collection(db, 'reservations'));
+          batch.set(newRef, {
+            roomId: selectedRoom.id,
+            date: cell.date,
+            periodId: cell.periodId,
+            borrower: '【キャンセル】'
+          });
+          deletedCount++;
         }
       }
     }
     
     if (deletedCount > 0) {
       await batch.commit();
-      alert(`${deletedCount}枠の予約・時間割を解除しました。`);
+      alert(`${deletedCount}枠の予約・時間割表示を解除しました。`);
     } else {
-      alert("選択された枠に解除できる予約・時間割がありませんでした。");
+      alert("選択された枠に解除できるデータがありませんでした。");
     }
     setSelectedCells([]);
   };
@@ -259,7 +265,7 @@ export default function Reservation() {
   };
 
   const handleExport = () => {
-    const exportData = [...reservations].sort((a, b) => {
+    const exportData = [...reservations].filter(r => r.borrower !== '【キャンセル】').sort((a, b) => {
       if(a.date !== b.date) return a.date.localeCompare(b.date);
       return a.periodId - b.periodId;
     }).map(r => {
@@ -282,15 +288,16 @@ export default function Reservation() {
     const existingRes = reservations.find(r => r.roomId === selectedRoom.id && r.date === day.dateStr && r.periodId === period.id);
     const existingTime = getTimetableForCell(day.dayName, period.name, selectedRoom.name);
     
-    const isOccupied = !!existingRes || !!existingTime;
+    const isCancelled = existingRes?.borrower === '【キャンセル】';
+    const isOccupied = (!!existingRes && !isCancelled) || (!!existingTime && !isCancelled);
     const isSelected = selectedCells.some(c => c.date === day.dateStr && c.periodId === period.id);
     
     let content = '-';
     if (isSelected) {
       content = '選択中';
-    } else if (existingRes) {
+    } else if (existingRes && !isCancelled) {
       content = `予約済\n${existingRes.borrower}`;
-    } else if (existingTime) {
+    } else if (existingTime && !isCancelled) {
       content = `時間割\n${existingTime.borrower}`;
     }
 
@@ -320,7 +327,7 @@ export default function Reservation() {
   };
 
   const roomReservations = selectedRoom 
-    ? [...reservations].filter(r => r.roomId === selectedRoom.id).sort((a, b) => {
+    ? [...reservations].filter(r => r.roomId === selectedRoom.id && r.borrower !== '【キャンセル】').sort((a, b) => {
         if(a.date !== b.date) return a.date.localeCompare(b.date);
         return a.periodId - b.periodId;
       })
