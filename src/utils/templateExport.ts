@@ -1,4 +1,6 @@
 import * as XLSX from 'xlsx';
+import { db } from '../firebase';
+import { collection, getDocs } from 'firebase/firestore';
 
 export const downloadExcelTemplate = () => {
   // 1. 備品マスター
@@ -82,4 +84,103 @@ export const downloadExcelTemplate = () => {
   XLSX.utils.book_append_sheet(workbook, wsTimetable, '時間割マスター');
   
   XLSX.writeFile(workbook, `和田小学校_初期設定マスター.xlsx`);
+};
+
+export const exportCurrentMasterData = async () => {
+  try {
+    const eqSnap = await getDocs(collection(db, 'equipments'));
+    const rmSnap = await getDocs(collection(db, 'rooms'));
+    const tSnap = await getDocs(collection(db, 'teachers'));
+    const ttSnap = await getDocs(collection(db, 'timetable'));
+
+    const equipmentsData = [
+      {
+        "name": "名称 (例: プロジェクター)",
+        "category": "カテゴリー (例: 視聴覚)",
+        "location": "保管場所 (例: 情報室)",
+        "floor": "階 (例: 3)",
+        "quantity": "総数 (半角数字, 例: 3)",
+        "locX": "マップX座標 (1-100, 空白可)",
+        "locY": "マップY座標 (1-100, 空白可)"
+      },
+      ...eqSnap.docs.map(doc => {
+        const d = doc.data();
+        return {
+          "name": d.name || "",
+          "category": d.category || "",
+          "location": d.location || "",
+          "floor": d.floor || "",
+          "quantity": d.quantity || "",
+          "locX": d.locX || "",
+          "locY": d.locY || ""
+        };
+      })
+    ];
+
+    const roomsData = [
+      {
+        "id": "識別ID (英数字, 例: meeting)",
+        "name": "教室名 (例: 会議室)",
+        "floor": "階 (例: 1)",
+        "x": "マップX座標 (1-100, 空白可)",
+        "y": "マップY座標 (1-100, 空白可)"
+      },
+      ...rmSnap.docs.map(doc => {
+        const d = doc.data();
+        return {
+          "id": doc.id || "",
+          "name": d.name || "",
+          "floor": d.floor || "",
+          "x": d.x || "",
+          "y": d.y || ""
+        };
+      })
+    ];
+
+    const teachersData = [
+      { "name": "教職員名 (例: 山田太郎)" },
+      ...tSnap.docs.map(doc => ({ "name": doc.data().name || "" }))
+    ];
+
+    const timetableData = [
+      {
+        "dayOfWeek": "曜日 (例: 月)",
+        "period": "時間帯 (例: 1限)",
+        "roomName": "教室名 (例: 理科室)",
+        "borrower": "使用者・授業名 (例: 5年1組 理科)"
+      },
+      ...ttSnap.docs.map(doc => {
+        const d = doc.data();
+        return {
+          "dayOfWeek": d.dayOfWeek || "",
+          "period": d.period || "",
+          "roomName": d.roomName || "",
+          "borrower": d.borrower || ""
+        };
+      })
+    ];
+
+    // シート作成
+    const wsEquipments = XLSX.utils.json_to_sheet(equipmentsData);
+    const wsRooms = XLSX.utils.json_to_sheet(roomsData);
+    const wsTeachers = XLSX.utils.json_to_sheet(teachersData);
+    const wsTimetable = XLSX.utils.json_to_sheet(timetableData);
+
+    // 幅調整
+    wsEquipments['!cols'] = [{wch:25}, {wch:15}, {wch:20}, {wch:10}, {wch:10}, {wch:15}, {wch:15}];
+    wsRooms['!cols'] = [{wch:15}, {wch:20}, {wch:10}, {wch:15}, {wch:15}];
+    wsTeachers['!cols'] = [{wch:25}];
+    wsTimetable['!cols'] = [{wch:15}, {wch:15}, {wch:20}, {wch:30}];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, wsEquipments, '備品マスター');
+    XLSX.utils.book_append_sheet(workbook, wsRooms, '教室マスター');
+    XLSX.utils.book_append_sheet(workbook, wsTeachers, '教職員マスター');
+    XLSX.utils.book_append_sheet(workbook, wsTimetable, '時間割マスター');
+    
+    XLSX.writeFile(workbook, `和田小学校_現在のマスターデータ.xlsx`);
+  } catch (error) {
+    console.error("Error exporting current master data:", error);
+    alert("データのエクスポート中にエラーが発生しました。");
+  }
 };

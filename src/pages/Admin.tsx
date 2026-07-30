@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { UploadCloud, Settings, Database, Download } from 'lucide-react';
 import { importEquipmentsFromExcel } from '../utils/excelImport';
-import { downloadExcelTemplate } from '../utils/templateExport';
+import { downloadExcelTemplate, exportCurrentMasterData } from '../utils/templateExport';
 import styles from './Reservation.module.css'; // Reusing some base styles
 
 export default function Admin() {
@@ -54,12 +54,21 @@ export default function Admin() {
               ※「備品マスター」という名前のシートが含まれている必要があります。
             </p>
 
-            <button 
-              onClick={downloadExcelTemplate}
-              style={{display:'inline-flex', alignItems:'center', gap:'8px', background:'var(--surface-color-light)', border:'1px solid var(--accent-gold)', color:'var(--accent-gold)', padding:'8px 16px', borderRadius:'var(--radius-md)', alignSelf: 'flex-start', marginBottom: '1rem', fontWeight: 600, cursor: 'pointer'}}
-            >
-              <Download size={18} /> 初期設定用Excelテンプレートをダウンロード
-            </button>
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+              <button 
+                onClick={downloadExcelTemplate}
+                style={{display:'inline-flex', alignItems:'center', gap:'8px', background:'var(--surface-color-light)', border:'1px solid var(--text-secondary)', color:'var(--text-secondary)', padding:'8px 16px', borderRadius:'var(--radius-md)', fontWeight: 600, cursor: 'pointer'}}
+              >
+                <Download size={18} /> 空のテンプレートをダウンロード
+              </button>
+              
+              <button 
+                onClick={exportCurrentMasterData}
+                style={{display:'inline-flex', alignItems:'center', gap:'8px', background:'var(--accent-gold)', border:'1px solid var(--accent-gold)', color:'var(--bg-color)', padding:'8px 16px', borderRadius:'var(--radius-md)', fontWeight: 600, cursor: 'pointer'}}
+              >
+                <Download size={18} /> 現在のマスターデータを出力する
+              </button>
+            </div>
             
             <div style={{
               border: '2px dashed var(--border-color)',

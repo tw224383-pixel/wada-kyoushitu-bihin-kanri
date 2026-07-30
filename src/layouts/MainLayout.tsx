@@ -1,5 +1,5 @@
 import { Outlet, Link } from 'react-router-dom';
-import { LayoutDashboard, Settings, User } from 'lucide-react';
+import { LayoutDashboard, Settings } from 'lucide-react';
 import styles from './MainLayout.module.css';
 
 export default function MainLayout() {
@@ -14,9 +14,6 @@ export default function MainLayout() {
           <Link to="/admin" className={styles.iconButton} aria-label="設定">
             <Settings size={20} />
           </Link>
-          <button className={styles.iconButton} aria-label="プロフィール">
-            <User size={20} />
-          </button>
         </div>
       </header>
       
