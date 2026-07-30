@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { collection, writeBatch, doc } from 'firebase/firestore';
+import { collection, writeBatch, doc, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 
 /**
@@ -13,6 +13,20 @@ export const importEquipmentsFromExcel = async (file: File): Promise<void> => {
         const data = e.target?.result;
         const workbook = XLSX.read(data, { type: 'binary' });
         
+        const clearCollection = async (collName: string) => {
+          const snap = await getDocs(collection(db, collName));
+          if (snap.empty) return;
+          const deleteBatch = writeBatch(db);
+          snap.docs.forEach(d => deleteBatch.delete(d.ref));
+          await deleteBatch.commit();
+        };
+
+        if (workbook.SheetNames.includes("備品マスター")) await clearCollection('equipments');
+        if (workbook.SheetNames.includes("教室マスター")) await clearCollection('rooms');
+        if (workbook.SheetNames.includes("教職員マスター")) await clearCollection('teachers');
+        if (workbook.SheetNames.includes("時間割マスター")) await clearCollection('timetable');
+        if (workbook.SheetNames.includes("A・B週設定")) await clearCollection('week_mappings');
+
         const batch = writeBatch(db);
         
         // 1. 備品マスターのインポート
@@ -90,7 +104,7 @@ export const importEquipmentsFromExcel = async (file: File): Promise<void> => {
         // 5. A・B週設定のインポート
         if (workbook.SheetNames.includes("A・B週設定")) {
           const ws = workbook.Sheets["A・B週設定"];
-          const json = XLSX.utils.sheet_to_json<any>(ws);
+          const json = XLSX.utils.sheet_to_json<any>(ws, { raw: false });
           const colRef = collection(db, 'week_mappings');
           
           json.forEach((item, index) => {

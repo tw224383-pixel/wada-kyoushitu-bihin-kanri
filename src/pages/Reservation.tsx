@@ -106,8 +106,21 @@ export default function Reservation() {
     const currentMs = currentWeekStart.getTime();
     for (const mapping of weekMappings) {
       if (!mapping.startDate || !mapping.endDate) continue;
-      const start = new Date(mapping.startDate.replace(/\//g, '-')).getTime();
-      const end = new Date(mapping.endDate.replace(/\//g, '-')).getTime();
+      
+      let startStr = String(mapping.startDate);
+      let endStr = String(mapping.endDate);
+      
+      // Handle Excel serial numbers if any slipped through
+      if (!isNaN(Number(startStr)) && Number(startStr) > 20000) {
+        startStr = new Date((Number(startStr) - 25569) * 86400 * 1000).toISOString().split('T')[0];
+      }
+      if (!isNaN(Number(endStr)) && Number(endStr) > 20000) {
+        endStr = new Date((Number(endStr) - 25569) * 86400 * 1000).toISOString().split('T')[0];
+      }
+
+      const start = new Date(startStr.replace(/\//g, '-')).getTime();
+      const end = new Date(endStr.replace(/\//g, '-')).getTime();
+      
       if (currentMs >= start && currentMs <= end) {
         return mapping.weekType;
       }
