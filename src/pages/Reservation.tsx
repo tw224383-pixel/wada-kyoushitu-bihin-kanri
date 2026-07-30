@@ -1,5 +1,5 @@
 import { useState, useMemo, Fragment, useEffect } from 'react';
-import { CalendarDays, Map, List, MapPin, X, Download, ChevronLeft, ChevronRight, ListOrdered, Trash2 } from 'lucide-react';
+import { CalendarDays, Map, List, MapPin, X, Download, ChevronLeft, ChevronRight, ListOrdered, Trash2, Unlock, Lock } from 'lucide-react';
 import styles from './Reservation.module.css';
 import { exportToExcel } from '../utils/excelExport';
 import { db } from '../firebase';
@@ -42,6 +42,7 @@ export default function Reservation() {
   const [showList, setShowList] = useState(false);
   const [selectedCells, setSelectedCells] = useState<{date: string, periodId: number}[]>([]);
   const [borrower, setBorrower] = useState('');
+  const [isKyomuMode, setIsKyomuMode] = useState(false);
 
   // リアルタイムリスナー設定
   useEffect(() => {
@@ -151,7 +152,7 @@ export default function Reservation() {
   };
 
   const toggleCellSelection = (dateStr: string, periodId: number, isOccupied: boolean) => {
-    if (isOccupied) {
+    if (isOccupied && !isKyomuMode) {
       const pwd = prompt("この枠は既に予約・時間割が登録されています。\n強制的に割り込み予約をしますか？\nパスワード:");
       if (pwd !== "wada8817") {
         if (pwd !== null) alert("パスワードが違います。");
@@ -197,10 +198,12 @@ export default function Reservation() {
   const handleDeleteSelected = async () => {
     if (!selectedRoom || selectedCells.length === 0) return;
     
-    const pwd = prompt("選択した枠の予約を解除します。パスワードを入力してください:");
-    if (pwd !== "wada8817") {
-      if (pwd !== null) alert("パスワードが違います。");
-      return;
+    if (!isKyomuMode) {
+      const pwd = prompt("選択した枠の予約を解除します。パスワードを入力してください:");
+      if (pwd !== "wada8817") {
+        if (pwd !== null) alert("パスワードが違います。");
+        return;
+      }
     }
     
     const batch = writeBatch(db);
@@ -211,22 +214,40 @@ export default function Reservation() {
         batch.delete(doc(db, 'reservations', existing.id));
         deletedCount++;
       }
+
+      if (isKyomuMode) {
+        const parts = cell.date.split('-');
+        const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        const jpDays = ['日','月','火','水','木','金','土'];
+        const dayName = jpDays[d.getDay()];
+        const periodName = PERIODS.find(p => p.id === cell.periodId)?.name;
+        
+        if (periodName) {
+          const existingTime = getTimetableForCell(dayName, periodName, selectedRoom.name);
+          if (existingTime) {
+            batch.delete(doc(db, 'timetable', existingTime.id));
+            deletedCount++;
+          }
+        }
+      }
     }
     
     if (deletedCount > 0) {
       await batch.commit();
-      alert(`${deletedCount}枠の予約を解除しました。`);
+      alert(`${deletedCount}枠の予約・時間割を解除しました。`);
     } else {
-      alert("選択された枠に解除できる予約がありませんでした（※時間割はマスターデータから変更してください）。");
+      alert("選択された枠に解除できる予約・時間割がありませんでした。");
     }
     setSelectedCells([]);
   };
 
   const handleDeleteSingleReservation = async (reservationId: string) => {
-    const pwd = prompt("この予約を解除します。パスワードを入力してください:");
-    if (pwd !== "wada8817") {
-      if (pwd !== null) alert("パスワードが違います。");
-      return;
+    if (!isKyomuMode) {
+      const pwd = prompt("この予約を解除します。パスワードを入力してください:");
+      if (pwd !== "wada8817") {
+        if (pwd !== null) alert("パスワードが違います。");
+        return;
+      }
     }
     try {
       await deleteDoc(doc(db, 'reservations', reservationId));
@@ -313,6 +334,27 @@ export default function Reservation() {
           教室利用予約
         </h1>
         <div style={{display: 'flex', gap: '1rem', alignItems: 'center'}}>
+          <button 
+            onClick={() => {
+              if (isKyomuMode) {
+                setIsKyomuMode(false);
+              } else {
+                const pwd = prompt("教務編集モードを有効にします。パスワード:");
+                if (pwd === "wada8817") setIsKyomuMode(true);
+                else if (pwd !== null) alert("パスワードが違います。");
+              }
+            }}
+            style={{
+              display:'flex', alignItems:'center', gap:'8px', 
+              background: isKyomuMode ? 'rgba(255, 107, 107, 0.1)' : 'var(--surface-color)', 
+              border: isKyomuMode ? '1px solid #ff6b6b' : '1px solid var(--border-color)', 
+              color: isKyomuMode ? '#ff6b6b' : 'var(--text-primary)', 
+              padding:'8px 16px', borderRadius:'var(--radius-md)'
+            }}
+          >
+            {isKyomuMode ? <Unlock size={18} /> : <Lock size={18} />} 
+            {isKyomuMode ? '教務編集モードON' : '教務編集'}
+          </button>
           <button 
             onClick={handleExport}
             style={{display:'flex', alignItems:'center', gap:'8px', background:'var(--surface-color)', border:'1px solid var(--border-color)', color:'var(--text-primary)', padding:'8px 16px', borderRadius:'var(--radius-md)'}}
