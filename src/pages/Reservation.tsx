@@ -103,14 +103,18 @@ export default function Reservation() {
   };
 
   const currentWeekType = useMemo(() => {
-    const currentMs = currentWeekStart.getTime();
+    // タイムゾーンによるズレを防ぐため、時刻を0時にセット
+    const d = new Date(currentWeekStart);
+    d.setHours(0, 0, 0, 0);
+    const currentMs = d.getTime();
+    
     for (const mapping of weekMappings) {
       if (!mapping.startDate || !mapping.endDate) continue;
       
       let startStr = String(mapping.startDate);
       let endStr = String(mapping.endDate);
       
-      // Handle Excel serial numbers if any slipped through
+      // Excelのシリアル値対策
       if (!isNaN(Number(startStr)) && Number(startStr) > 20000) {
         startStr = new Date((Number(startStr) - 25569) * 86400 * 1000).toISOString().split('T')[0];
       }
@@ -118,8 +122,17 @@ export default function Reservation() {
         endStr = new Date((Number(endStr) - 25569) * 86400 * 1000).toISOString().split('T')[0];
       }
 
-      const start = new Date(startStr.replace(/\//g, '-')).getTime();
-      const end = new Date(endStr.replace(/\//g, '-')).getTime();
+      // ローカルタイムでの0時としてパースする関数
+      const parseLocalDate = (str: string) => {
+        const parts = str.split(/[-/]/);
+        if (parts.length >= 3) {
+          return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]), 0, 0, 0, 0).getTime();
+        }
+        return new Date(str).getTime(); // fallback
+      };
+
+      const start = parseLocalDate(startStr);
+      const end = parseLocalDate(endStr) + 86400000 - 1; // 終了日の23:59:59まで
       
       if (currentMs >= start && currentMs <= end) {
         return mapping.weekType;
