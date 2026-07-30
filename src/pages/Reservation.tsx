@@ -1,9 +1,9 @@
 import { useState, useMemo, Fragment, useEffect } from 'react';
-import { CalendarDays, Map, List, MapPin, X, Download, ChevronLeft, ChevronRight, ListOrdered } from 'lucide-react';
+import { CalendarDays, Map, List, MapPin, X, Download, ChevronLeft, ChevronRight, ListOrdered, Trash2 } from 'lucide-react';
 import styles from './Reservation.module.css';
 import { exportToExcel } from '../utils/excelExport';
 import { db } from '../firebase';
-import { collection, onSnapshot, doc, writeBatch } from 'firebase/firestore';
+import { collection, onSnapshot, doc, writeBatch, deleteDoc } from 'firebase/firestore';
 
 const PERIODS = [
   { id: 1, name: '1限' },
@@ -166,6 +166,49 @@ export default function Reservation() {
     await batch.commit();
     alert(`${selectedCells.length}枠を ${borrower} で予約（上書き含む）しました。`);
     setSelectedCells([]);
+  };
+
+  const handleDeleteSelected = async () => {
+    if (!selectedRoom || selectedCells.length === 0) return;
+    
+    const pwd = prompt("選択した枠の予約を解除します。パスワードを入力してください:");
+    if (pwd !== "wada8817") {
+      if (pwd !== null) alert("パスワードが違います。");
+      return;
+    }
+    
+    const batch = writeBatch(db);
+    let deletedCount = 0;
+    for (const cell of selectedCells) {
+      const existing = reservations.find(r => r.roomId === selectedRoom.id && r.date === cell.date && r.periodId === cell.periodId);
+      if (existing) {
+        batch.delete(doc(db, 'reservations', existing.id));
+        deletedCount++;
+      }
+    }
+    
+    if (deletedCount > 0) {
+      await batch.commit();
+      alert(`${deletedCount}枠の予約を解除しました。`);
+    } else {
+      alert("選択された枠に解除できる予約がありませんでした（※時間割はマスターデータから変更してください）。");
+    }
+    setSelectedCells([]);
+  };
+
+  const handleDeleteSingleReservation = async (reservationId: string) => {
+    const pwd = prompt("この予約を解除します。パスワードを入力してください:");
+    if (pwd !== "wada8817") {
+      if (pwd !== null) alert("パスワードが違います。");
+      return;
+    }
+    try {
+      await deleteDoc(doc(db, 'reservations', reservationId));
+      alert("予約を解除しました。");
+    } catch (e) {
+      console.error(e);
+      alert("エラーが発生しました。");
+    }
   };
 
   const handleExport = () => {
@@ -368,7 +411,16 @@ export default function Reservation() {
                             <div style={{fontWeight: 'bold'}}>
                               {r.date} <span style={{color: 'var(--text-secondary)', marginLeft: '8px'}}>{period?.name}</span>
                             </div>
-                            <div style={{color: 'var(--accent-gold)', fontWeight: 'bold'}}>{r.borrower}</div>
+                            <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+                              <div style={{color: 'var(--accent-gold)', fontWeight: 'bold'}}>{r.borrower}</div>
+                              <button 
+                                onClick={() => handleDeleteSingleReservation(r.id)}
+                                style={{background: 'transparent', border: 'none', color: '#ff6b6b', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center'}}
+                                aria-label="予約を解除"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            </div>
                           </div>
                         );
                       })}
@@ -461,6 +513,15 @@ export default function Reservation() {
                 <button className={`${styles.btn} ${styles.btnCancel}`} onClick={() => setSelectedRoom(null)}>
                   閉じる
                 </button>
+                {!showList && selectedCells.length > 0 && (
+                  <button 
+                    className={styles.btn} 
+                    onClick={handleDeleteSelected}
+                    style={{background: 'transparent', border: '1px solid #ff6b6b', color: '#ff6b6b'}}
+                  >
+                    選択枠の予約を解除
+                  </button>
+                )}
                 {!showList && (
                   <button 
                     className={`${styles.btn} ${styles.btnPrimary}`} 
